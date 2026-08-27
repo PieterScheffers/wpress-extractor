@@ -6,4 +6,4 @@ A simple go app that allows you to extract .wpress files created by the awesome 
 2. Trust the repository: `mise trust`
 3. Install mise dependencies: `mise install`
 4. Extract a `.wpress` file: `mise run extract <.wpress-file>`
-5. Zip the extracted contents
+5. Or extract and zip the contents op the `.wpress` file: `mise run zip <.wpress-file>`
