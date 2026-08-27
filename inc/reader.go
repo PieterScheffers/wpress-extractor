@@ -25,7 +25,6 @@
 package wpress
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -97,16 +96,16 @@ func (r Reader) Extract() (int, error) {
 		// initialize new header
 		h := &Header{}
 
-		// check if block equals EOF sequence
-		if bytes.Compare(block, h.GetEOFBlock()) == 0 {
+		// populate header from our block bytes
+		h.PopulateFromBytes(block)
+
+		// check if the header marks the end of the archive
+		if h.IsEOF() {
 			// EOF reached, stop the loop
 			break
 		}
 
-		// populate header from our block bytes
-		h.PopulateFromBytes(block)
-
-		pathToFile := path.Clean("." + string(os.PathSeparator) + string(bytes.Trim(h.Prefix, "\x00")) + string(os.PathSeparator) + string(bytes.Trim(h.Name, "\x00")))
+		pathToFile := path.Clean("." + string(os.PathSeparator) + string(h.GetPrefix()) + string(os.PathSeparator) + string(h.GetName()))
 		if runtime.GOOS == "windows" {
 		    sep := fmt.Sprintf("%c", PATH_SEPARATOR_UNIX)
 		    pathToFile = strings.Replace(pathToFile,"\\",sep,-1)
@@ -202,14 +201,14 @@ func (r Reader) GetFilesCount() (int, error) {
 		// initialize new header
 		h := &Header{}
 
-		// check if block equals EOF sequence
-		if bytes.Compare(block, h.GetEOFBlock()) == 0 {
+		// populate header from our block bytes
+		h.PopulateFromBytes(block)
+
+		// check if the header marks the end of the archive
+		if h.IsEOF() {
 			// EOF reached, stop the loop
 			break
 		}
-
-		// populate header from our block bytes
-		h.PopulateFromBytes(block)
 
 		// set pointer after file content, to the next header block
 		size, err := h.GetSize()

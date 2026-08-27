@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/yani-/wpress"
+	wpress "github.com/fifthsegment/Wpress-Extractor/inc"
 	"os"
 )
 

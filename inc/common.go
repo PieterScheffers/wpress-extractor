@@ -134,10 +134,41 @@ func (h Header) GetHeaderBlock() []byte {
 	return block
 }
 
+// field returns the contents of a fixed-width, zero-padded header field, that
+// is everything up to the first zero byte. The field cannot simply be trimmed:
+// recent versions of the plugin store an 8 byte checksum in the last bytes of
+// the header block, so the prefix field is followed by unrelated data that must
+// be ignored rather than kept.
+func field(b []byte) []byte {
+	if i := bytes.IndexByte(b, 0); i != -1 {
+		return b[:i]
+	}
+
+	return b
+}
+
+// GetName returns the filename, without any path
+func (h Header) GetName() []byte {
+	return field(h.Name)
+}
+
+// GetPrefix returns the path to the file, without a trailing slash
+func (h Header) GetPrefix() []byte {
+	return field(h.Prefix)
+}
+
 // GetSize returns content size
 func (h Header) GetSize() (int, error) {
-	// remove any trailing zero bytes, convert to string, then convert to integer
-	return strconv.Atoi(string(bytes.Trim(h.Size, "\x00")))
+	// remove the zero padding, convert to string, then convert to integer
+	return strconv.Atoi(string(field(h.Size)))
+}
+
+// IsEOF tells if the header marks the end of the archive. Archives used to end
+// with a block of zero bytes, which has an empty filename. Recent versions of
+// the plugin end with a header that keeps the total size of the archive in its
+// size field, which has an empty filename too.
+func (h Header) IsEOF() bool {
+	return len(h.GetName()) == 0
 }
 
 // GetEOFBlock returns byte sequence describing EOF
