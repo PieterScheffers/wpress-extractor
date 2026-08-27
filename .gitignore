@@ -1,2 +1,6 @@
 *.wpress
 extracted/
+
+.DS_Store
+bin/
+zips/

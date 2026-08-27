@@ -1,2 +1,95 @@
 [tools]
 go = "latest"
+
+[tasks.build]
+description = "Build the extractor into bin/wpress-extractor"
+run = "go build -o bin/wpress-extractor ."
+sources = ["*.go", "inc/*.go", "go.mod"]
+outputs = ["bin/wpress-extractor"]
+
+[tasks.extract]
+description = "Extract a .wpress archive into extracted/<archive name>"
+depends = ["build"]
+usage = 'arg "<archive>" help="Path to the .wpress file to extract"'
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Tasks always run from the project root, so a relative path has to be resolved
+# against the directory mise was invoked from instead.
+archive="$usage_archive"
+case "$archive" in
+	/*) ;;
+	*) archive="$MISE_ORIGINAL_CWD/$archive" ;;
+esac
+
+if [ ! -f "$archive" ]; then
+	echo "no such .wpress file: $archive" >&2
+	exit 1
+fi
+
+# The extractor always writes into its working directory, so give every archive
+# a directory of its own and hand the binary an absolute path.
+name="$(basename "$archive")"
+binary="$PWD/bin/wpress-extractor"
+outdir="$PWD/extracted/${name%.wpress}"
+
+# Start from an empty directory: the extractor overwrites files but never
+# removes them, so a re-run would otherwise keep files an older backup had.
+rm -rf "$outdir"
+mkdir -p "$outdir"
+cd "$outdir"
+"$binary" "$archive"
+
+echo "Extracted $name to $outdir"
+'''
+
+[tasks.zip]
+description = "Extract a .wpress archive and zip its contents into zips/<archive name>.zip"
+usage = 'arg "<archive>" help="Path to the .wpress file to extract and zip"'
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v zip >/dev/null; then
+	echo "zip is not installed" >&2
+	exit 1
+fi
+
+# Tasks always run from the project root, so a relative path has to be resolved
+# against the directory mise was invoked from instead.
+archive="$usage_archive"
+case "$archive" in
+	/*) ;;
+	*) archive="$MISE_ORIGINAL_CWD/$archive" ;;
+esac
+
+if [ ! -f "$archive" ]; then
+	echo "no such .wpress file: $archive" >&2
+	exit 1
+fi
+
+# The extract task cannot go in depends, as mise only passes static arguments to
+# a dependency and extract needs the archive this task was given.
+mise run extract "$archive"
+
+name="$(basename "$archive")"
+name="${name%.wpress}"
+
+srcdir="$PWD/extracted/$name"
+zipfile="$PWD/zips/$name.zip"
+
+mkdir -p "$(dirname "$zipfile")"
+
+# zip adds to an existing archive rather than replacing it, so start clean.
+rm -f "$zipfile"
+
+# Zip from inside the directory so the site files sit at the top level of the
+# archive instead of below a directory named after the backup. -q keeps 27k
+# filenames out of the log and -X leaves out local filesystem attributes.
+# Nothing is excluded: dot files and .DS_Store are part of the backup contents.
+cd "$srcdir"
+zip -q -r -X "$zipfile" .
+
+echo "Zipped $name to $zipfile ($(du -h "$zipfile" | cut -f1))"
+'''
